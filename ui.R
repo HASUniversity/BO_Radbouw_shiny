@@ -17,6 +17,29 @@
 # Het bestand wat van toepassing is, is het template.wide.html bestand.
 # Het desbetreffende HTML bestand staat in de map 'www'.
 
+#Inlezen data
+source("SamenMeten_Sensor1.R")
+inlezensamenmeten()
+source("SamenMeten_Sensor2.R")
+inlezensamenmeten()
+source("SamenMeten_Sensor3.R")
+inlezensamenmeten()
+source("SamenMeten_Sensor4.R")
+inlezensamenmeten()
+source("SamenMeten_Sensor5.R")
+inlezensamenmeten()
+source("SamenMeten_Sensor6.R")
+inlezensamenmeten()
+source("SamenMeten_Sensor7.R")
+inlezensamenmeten()
+source("SamenMeten_Sensor8.R")
+inlezensamenmeten()
+source("API_Luftdaten_1_smma.R")
+getluftdaten() 
+
+source("global_smma.R")
+inlezendata()
+
 # HTML template voor de opmaak/styling
 htmlTemplate("./www/template.wide.html",
              pageTitle=paste("Smart Emission 2, deelproject 2: ", projectnaam),
@@ -26,7 +49,9 @@ htmlTemplate("./www/template.wide.html",
 # Het platform bevat een aantal belangrijke functionaliteiten.
 # De basis, die is gelegd, komt voort uit het Hollandse Luchten platform van het RIVM
 # Vanuit de basis zijn er een aantal elementen toegevoegd.
-  
+ 
+
+ 
   fluidPage=fluidPage(
     navbarPage("",
                
