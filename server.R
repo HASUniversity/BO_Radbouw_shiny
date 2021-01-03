@@ -18,7 +18,7 @@ function(input, output, session){
   
   ## Gedeelte 1 ----
   # Initialiseren kaart en reactieve datasets
-    # Genereren onderliggende kaart voor de toolbox ----
+  # Genereren onderliggende kaart voor de toolbox ----
   # Hierop staan de knmi-stations, de luchtmeetnetstations en de sensoren
   # Daarnaast zijn er edit buttons toegevoegd
   output$map <- renderLeaflet({
@@ -39,20 +39,20 @@ function(input, output, session){
         editOptions = editToolbarOptions(edit = FALSE, selectedPathOptions = selectedPathOptions()))
   })
   
-    # Reactieve datasets opzetten----
+  # Reactieve datasets opzetten----
   values <- reactiveValues(df = sensor_unique, groepsnaam = geen_groep, actiegroep = FALSE, df_gem = data.frame()) 
   overzicht_shapes <- reactiveValues(add = 0, delete = 0) # nodig om selectie ongedaan te maken
   
   ## Gedeelte 2 ----
   # Functionaliteiten sensoren in de toolbox
-    # Functie: Set the sensor as deselect and change color to base color ----
+  # Functie: Set the sensor as deselect and change color to base color ----
   set_sensor_deselect <- function(id_select){
     values$df[values$df$kit_id == id_select, "selected"] <- FALSE 
     values$df[values$df$kit_id == id_select, "kleur"] <- kleur_marker_sensor
     values$df[values$df$kit_id == id_select, "groep"] <- geen_groep
   }
   
-    # Functie: Set sensor as select and specify color ----
+  # Functie: Set sensor as select and specify color ----
   set_sensor_select <- function(id_select){
     values$df[values$df$kit_id == id_select, "selected"] <- TRUE 
     # Selecteer een kleur en geef dit mee aan de sensor
@@ -89,7 +89,7 @@ function(input, output, session){
     kleur_sensor <- "leeg"
   }
   
-    # Functie om de plaats van de sensoren met de juiste kleur op de kaart weer te geven ----
+  # Functie om de plaats van de sensoren met de juiste kleur op de kaart weer te geven ----
   add_sensors_map <- function(){ 
     # Regenerate the sensors for the markers
     sensor_loc <- unique(select(values$df, kit_id, lat, lon, kleur, selected))
@@ -100,7 +100,7 @@ function(input, output, session){
     proxy %>% addCircleMarkers(data = sensor_loc, ~lon, ~lat, layerId = ~kit_id, label = lapply(as.list(sensor_loc$kit_id), HTML),
                                radius = 8, color = ~kleur, fillOpacity = 1,stroke = ~selected, group = "sensoren")}
   
-    # Functie om van alle groepen in de dataset een gemiddelde te berekenen ----
+  # Functie om van alle groepen in de dataset een gemiddelde te berekenen ----
   calc_groep_mean <- function(){
     # LET OP: wind moet via vectormean. Zie openair timeAverage
     gemiddeld_all <- data.frame()
@@ -122,7 +122,7 @@ function(input, output, session){
   ## Gedeelte 3 ----
   # Observatie functionaliteiten
   
-    # Observeratie of er een groep gaat worden gebruikt ----
+  # Observeratie of er een groep gaat worden gebruikt ----
   observeEvent({input$A_groep},{
     if(input$A_groep){
       # Selectie van een groep. Sensoren krijgen groepsnaam en zelfde kleur
@@ -136,7 +136,7 @@ function(input, output, session){
     }
   })     
   
-    # Observeratie of de tekst wordt aangepast (de checkbox is dan aangeklikt) ----
+  # Observeratie of de tekst wordt aangepast (de checkbox is dan aangeklikt) ----
   # Dan wil je dat er een nieuwe groep wordt aangemaakt
   # Bijvoorbeeld: je hebt een groep "Wijk aan Zee" aangemaakt, en je begint een nieuwe naam te typen "IJmuiden". 
   # Deze groep moet dan nieuw aangemaakt worden "IJmuiden".
@@ -146,7 +146,7 @@ function(input, output, session){
     }
   })
   
-    # Observeratie of de gebruiker een sensor selecteerd ----
+  # Observeratie of de gebruiker een sensor selecteerd ----
   observeEvent({input$map_marker_click$id}, {
     id_select <- input$map_marker_click$id
     # Wanneer er op een Luchtmeetnet of KNMI station marker geklikt wordt, gebeurt er niks
@@ -165,7 +165,7 @@ function(input, output, session){
     }
   })
   
-    # Observeratie of de selectie moet worden gereset ----
+  # Observeratie of de selectie moet worden gereset ----
   # De values selected worden weer FALSE en de markers kleur_sensor_marker gekleurd, groepen verwijderd
   observeEvent(input$reset, {
     values$df[, "selected"] <- FALSE 
@@ -175,7 +175,7 @@ function(input, output, session){
     add_sensors_map()
   })
   
-    # Observeratie van een multiselectie ----
+  # Observeratie van een multiselectie ----
   observeEvent(input$map_draw_new_feature,{
     
     # Houd bij hoeveel features er zijn. Later nodig bij verwijderen, i.v.m. reset ook de losse selectie.
@@ -204,7 +204,7 @@ function(input, output, session){
   })
   
   
-    # Observeratie voor  deselecteren van een multiselectie ----
+  # Observeratie voor  deselecteren van een multiselectie ----
   # Er zijn namelijk twee manieren om sensoren te selecteren: d.m.v. los aangeklikte sensoren (1), en d.m.v.
   # de DrawToolBox (2). De delete knop op de DrawToolBox verwijderd enkel de sensoren die d.m.v. de DrawToolBox geselecteerd zijn,
   # dus niet de losse sensoren. Onderstaand stukzorgt ervoor dat zowel selectie via (1) als (2) worden verwijderd.
@@ -243,13 +243,14 @@ function(input, output, session){
   ## Gedeelte 4 ----
   # Plots, grafieken en kaart functies
   
-    # Creeren time plot (openair) ----
+  # Creeren time plot (openair) ----
   output$timeplot <- renderPlot({
-    
+   
     comp <- selectReactiveComponent(input)
-    dates <- selectReactiveDates(input)
     selected_id <- values$df[which(values$df$selected & values$df$groep == geen_groep),'kit_id']
-    show_input <-input_df[which(input_df$kit_id %in% selected_id),]
+    show_input <- input_df %>% 
+      filter(kit_id %in% selected_id) %>% 
+      filter(date > input$TimeRange[1] & date < input$TimeRange[2])
     
     # Als er groepen zijn geselecteerd, bereken dan het gemiddelde
     if (length(unique(values$df$groep))>1){
@@ -258,61 +259,82 @@ function(input, output, session){
     
     # if / else statement om correctie gekalibreerde data toe te voegen ----
     if(comp == "pm10"){
-      try(timePlot(selectByDate(mydata = show_input,start = dates()$start, end = dates()$end),
-                   pollutant = c(comp, "pm10_kal"), wd = "wd", type = "kit_id", local.tz="Europe/Amsterdam"))
+      try(timePlot(show_input,
+                   pollutant = c(comp, "pm10_kal"), 
+                   wd = "wd", 
+                   type = "kit_id", 
+                   local.tz="Europe/Amsterdam"))
       # Call in try() zodat er geen foutmelding wordt getoond als er geen enkele sensor is aangeklikt 
     }
     if(comp == "pm25"){
-      try(timePlot(selectByDate(mydata = show_input,start = dates()$start, end = dates()$end),
-                   pollutant = c(comp, "pm25_kal"), wd = "wd", type = "kit_id", local.tz="Europe/Amsterdam"))
+      try(timePlot(show_input,
+                   pollutant = c(comp, "pm25_kal"), 
+                   wd = "wd", 
+                   type = "kit_id", 
+                   local.tz="Europe/Amsterdam"))
       # Call in try() zodat er geen foutmelding wordt getoond als er geen enkele sensor is aangeklikt 
     }
   })
   
-    # Creeren kalender PM10 plot (openair) ----
+  # Creeren kalender PM10 plot (openair) ----
   output$calendar1 <- renderPlot({
-    
     comp <- selectReactiveComponent(input)
-    dates <- selectReactiveDates(input)
     selected_id <- values$df[which(values$df$selected & values$df$groep == geen_groep),'kit_id']
-    show_input <-input_df[which(input_df$kit_id %in% selected_id),]
     
-    # Als er groepen zijn geselecteerd, bereken dan het gemiddelde
+    #show_input <-input_df[which(input_df$kit_id %in% selected_id),]
+    show_input <- input_df %>% 
+      filter(kit_id %in% selected_id) %>% 
+      filter(date > input$TimeRange[1] & date < input$TimeRange[2])
+      
+    
+    
+    #Als er groepen zijn geselecteerd, bereken dan het gemiddelde
     if (length(unique(values$df$groep))>1){
       calc_groep_mean() # berekent groepsgemiddeldes
       show_input <- merge(show_input,values$df_gem, all = T) }
     
-    try(calendarPlot(selectByDate(mydata = show_input, start = dates()$start, end = dates()$end),
-                     pollutant = comp, limits= c(0,50), cols = 'Reds', local.tz="Europe/Amsterdam")) 
-    # Call in try() zodat er geen foutmelding wordt getoond als er geen enkele sensor is aangeklikt 
-  })
-
-    # Creeren kalender PM2,5 plot (openair) ----
-  output$calendar2 <- renderPlot({
     
-    comp <- selectReactiveComponent(input)
-    dates <- selectReactiveDates(input)
-    selected_id <- values$df[which(values$df$selected & values$df$groep == geen_groep),'kit_id']
-    show_input <-input_df[which(input_df$kit_id %in% selected_id),]
-    
-    # Als er groepen zijn geselecteerd, bereken dan het gemiddelde
-    if (length(unique(values$df$groep))>1){
-      calc_groep_mean() # berekent groepsgemiddeldes
-      show_input <- merge(show_input,values$df_gem, all = T) }
-    
-    try(calendarPlot(selectByDate(mydata = show_input, start = dates()$start, end = dates()$end),
-                     pollutant = comp, limits= c(0,25), cols = 'Reds', local.tz="Europe/Amsterdam")) 
+    #try(calendarPlot(selectByDate(mydata = show_input, start = dates()$start, end = dates()$end),
+    try(calendarPlot(show_input,
+                     pollutant = "pm10", 
+                     limits= c(0,50), 
+                     cols = 'Reds', 
+                     local.tz="Europe/Amsterdam")) 
     # Call in try() zodat er geen foutmelding wordt getoond als er geen enkele sensor is aangeklikt 
   })
   
+  # Creeren kalender PM2,5 plot (openair) ----
+  output$calendar2 <- renderPlot({
     
-    # Creeren timevariation functie (openair) ----
+    comp <- selectReactiveComponent(input)
+    selected_id <- values$df[which(values$df$selected & values$df$groep == geen_groep),'kit_id']
+    show_input <-input_df[which(input_df$kit_id %in% selected_id),]
+    show_input <- input_df %>% 
+      filter(kit_id %in% selected_id) %>% 
+      filter(date > input$TimeRange[1] & date < input$TimeRange[2])
+    
+    # Als er groepen zijn geselecteerd, bereken dan het gemiddelde
+    if (length(unique(values$df$groep))>1){
+      calc_groep_mean() # berekent groepsgemiddeldes
+      show_input <- merge(show_input,values$df_gem, all = T) }
+    
+    try(calendarPlot(show_input,
+                     pollutant = "pm25", 
+                     limits= c(0,25), 
+                     cols = 'Reds', 
+                     local.tz="Europe/Amsterdam")) 
+    # Call in try() zodat er geen foutmelding wordt getoond als er geen enkele sensor is aangeklikt 
+  })
+  
+  
+  # Creeren timevariation functie (openair) ----
   output$timevariation <- renderPlot({
     
     comp <- selectReactiveComponent(input)
-    dates <- selectReactiveDates(input)
     selected_id <- values$df[which(values$df$selected & values$df$groep == geen_groep),'kit_id']
-    show_input <-input_df[which(input_df$kit_id %in% selected_id),]
+    show_input <- input_df %>% 
+      filter(kit_id %in% selected_id) %>% 
+      filter(date > input$TimeRange[1] & date < input$TimeRange[2])
     
     # Als er groepen zijn geselecteerd, bereken dan het gemiddelde
     if (length(unique(values$df$groep))>1){
@@ -334,70 +356,81 @@ function(input, output, session){
     # create colour array
     kleur_array <- kit_kleur_sort$kleur
     
-    try(timeVariation(selectByDate(mydata = show_input, start = dates()$start, end = dates()$end),
-                      pollutant = comp, normalise = FALSE, group = "kit_id",
-                      alpha = 0.1, cols = kleur_array, local.tz="Europe/Amsterdam",
+    try(timeVariation(show_input,
+                      pollutant = comp, 
+                      normalise = FALSE, 
+                      group = "kit_id",
+                      alpha = 0.1, 
+                      cols = kleur_array, 
+                      local.tz="Europe/Amsterdam",
                       ylim = c(0,NA))) 
     # Call in try() zodat er geen foutmelding wordt getoond als er geen enkele sensor is aangeklikt 
     
   })
   
-    # Creeren interactive graphic PM10 (plotly) ----
+  # Creeren interactive graphic PM10 (plotly) ----
   
   output$interplot <- renderPlotly({
     
     comp <- selectReactiveComponent(input)
-    dates <- selectReactiveDates(input)
     selected_id <- values$df[which(values$df$selected & values$df$groep == geen_groep),'kit_id']
-    show_input <-input_df[which(input_df$kit_id %in% selected_id),]
+    show_input <- input_df %>% 
+      filter(kit_id %in% selected_id) %>% 
+      filter(date > input$TimeRange[1] & date < input$TimeRange[2])
     
-    q <- ggplot(show_input, aes(x=date, y=pm10, color=kit_id))
-    q <- q + geom_line()
-    q <- q + geom_point(size=1)
-    q <- q + scale_colour_hue(name="Legenda", l=20)
-    q <- q + xlab("Datum") + ylab("pm 10")
-    q <- q + ggtitle("PM 10 waarde in een bepaald tijdsbestek")
-    q <- q + theme_bw()
+    show_input %>% 
+      ggplot(aes(date, pm10, color = kit_id)) +
+      geom_line() +
+      geom_point(size = 1) +
+      scale_colour_hue(name="Legenda", l=40) +
+      xlab("Datum") + 
+      ylab("pm 10") +
+      ggtitle("PM 10 waarde in een bepaald tijdsbestek") +
+      theme_bw()    
     
   })
-    # Creeren interactive graphic PM2,5 (plotly) ----
+  # Creeren interactive graphic PM2,5 (plotly) ----
   
   output$interplot_n <- renderPlotly({
     
     comp <- selectReactiveComponent(input)
-    dates <- selectReactiveDates(input)
     selected_id <- values$df[which(values$df$selected & values$df$groep == geen_groep),'kit_id']
-    show_input <-input_df[which(input_df$kit_id %in% selected_id),]
+    show_input <- input_df %>% 
+      filter(kit_id %in% selected_id) %>% 
+      filter(date > input$TimeRange[1] & date < input$TimeRange[2])
     
-    q <- ggplot(show_input, aes(x=date, y=pm25, color=kit_id))
-    q <- q + geom_line()
-    q <- q + geom_point(size=1)
-    q <- q + scale_colour_hue(name="Legenda", l=40)
-    q <- q + xlab("Datum") + ylab("pm 2,5")
-    q <- q + ggtitle("PM 2,5 waarde in een bepaald tijdsbestek")
-    q <- q + theme_bw()
-  
+    show_input %>% 
+      filter(kit_id %in% selected_id) %>% 
+      ggplot(aes(date, pm25, color = kit_id)) +
+      geom_line() +
+      geom_point(size = 1) +
+      scale_colour_hue(name="Legenda", l=40) +
+      xlab("Datum") + 
+      ylab("pm 2,5") +
+      ggtitle("PM 2,5 waarde in een bepaald tijdsbestek") +
+      theme_bw()    
+    
   }) 
   
-    # Creeren overzicht tabel Samen Meten----
+  # Creeren overzicht tabel Samen Meten----
   
   output$table_overviewSam <- renderDT(input_df,
-                           filter = "top",
-                           options = list(
-                             pageLength = 10
-                           )
+                                       filter = "top",
+                                       options = list(
+                                         pageLength = 10
+                                       )
   )
   
-    # Creeren overzicht tabel Samen Meten----
+  # Creeren overzicht tabel Samen Meten----
   
   output$table_overviewLuft <- renderDT(API_Luftdaten,
-                                    filter = "top",
-                                    options = list(
-                                      pageLength = 10
-                                    )
+                                        filter = "top",
+                                        options = list(
+                                          pageLength = 10
+                                        )
   )
   
-    # Creeren grote kaart ----
+  # Creeren grote kaart ----
   
   # Met de onderstaande codes worden de twee datastromen (pm10/pm2.5) voor de slider uitgewerkt
   # Met de functie reactive wordt er aangegeven dat de data moet mee veranderen met de instellingen van de slider
@@ -560,11 +593,11 @@ function(input, output, session){
                                      "Sensorwaarde:", sliderData2()$P2, "<br>",
                                      "Coordinaten:", sliderData2()$lat,",  ", sliderData2()$lon))
   })
-
+  
   ## Gedeelte 5 ----
   # Download functies 
-
-    # Creeren download functie voor de de sensoren in de toolbox (downloadtabblad) ----
+  
+  # Creeren download functie voor de de sensoren in de toolbox (downloadtabblad) ----
   datasetInput <- reactive({
     # Wanneer de gebruiker een sensor id selecteert, wordt de juiste dataset gegeven.
     switch(input$dataset,
@@ -577,10 +610,10 @@ function(input, output, session){
            "LTD_27720" = input_df7,
            "LTD_31298" = input_df8)
   })
-
+  
   fileext <- reactive({
     switch(input$type,
-    # Wanneer de gebruiker een bestandsformaat selecteert, wordt het juiste formaat gegeven.
+           # Wanneer de gebruiker een bestandsformaat selecteert, wordt het juiste formaat gegeven.
            "Excel (CSV)" = "csv", "Text (TSV)" = "txt", "Text (Space Seperated)" = "txt", "Doc" = "doc")
   })
   
@@ -597,7 +630,7 @@ function(input, output, session){
                   row.names = FALSE)
     }
   )
-    # Creeren download functies voor de plotten in de toolbox (test) ----
+  # Creeren download functies voor de plotten in de toolbox (test) ----
   
   output$downloadTimePlot <- downloadHandler(
     filename = function(){ 

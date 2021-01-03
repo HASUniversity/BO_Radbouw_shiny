@@ -1,81 +1,126 @@
-## ---------------------------------------------------------
-## R Script voor interactieve data-analyse van sensordata, met o.a. packages zoals 'shiny', 'leaflet' en 'openair'.     
-## Dit platform bestaat uit meerdere scripts. Dit is het global.R script.
-## Auteurs: 
-## (Fundatie platform) Henri de Ruiter en Elma Tenner namens het Samen Meten Team, RIVM. 
-## (Uitbreiding platform) Thomas Geurts van Kessel en Stefan Knoet namens de HAS en Radboud Universiteit 
-## Laatste versie: juni 2020
-## ---------------------------------------------------------
-## Opmerkingen: 
-## (In dit script wordt er een titel toegewezen aan het platform.)
-## Het eerste deel bevat de pakketten die nodig zijn voor het platform.
-## Het tweede deel bevat het inladen van de desbetreffende datasets van de API's.
-## Het derde deel bevat het inladen van de reactieve onderdelen.
-## Het vierde deel bevat originele codes voor de stijling van sensoren.
-## ---------------------------------------------------------
+library(httr)
+library(jsonlite)
+library(tidyjson)
+library(tidyverse)
+library(lubridate)
 
-## Titel platform ---- 
-projectnaam <- "Burger Sensor Data platform"
 
-## Gedeelte 1 ----
-# Benodigde pakketten installeren en activeren.
+#Voordat Shiny app wordt opgestart, wordt eerst de data binnengehaald
+#In eerste instantie is dat de data van de laatste 5 minuten
 
-# Installeren: 'install.packages()'
-# Activeren: 'library()'s
-library(openair)
+# API Luftdaten.--------------------------------------------------
+
+#URL
+#v2 gives the average over last five minutes
+Linkluftdaten <- "http://api.luftdaten.info/static/v2/data.json"
+#Filter werkt nog niet
+#Linkluftdaten <- "http://api.luftdaten.info/static/v2/filter/country=NL/data.json"
+
+#Get the data
+dataluftd <- GET(Linkluftdaten)
+luftdaten_text <- content(dataluftd, as = "text")
+
+#Correcte manier van unnesten.
+API_Luftdaten <- fromJSON(luftdaten_text, flatten = TRUE) %>%
+  filter(location.country == "NL") %>% 
+  rename(kit_id = id) %>% 
+  select(-c(sampling_rate,location.exact_location, location.altitude, location.indoor, sensor.pin, sensor.sensor_type.id)) %>% 
+  unnest(sensordatavalues) %>% 
+  filter(value_type %in% c("P1", "P2")) %>% 
+  mutate(value = as.numeric(value)) %>% 
+  pivot_wider(names_from = value_type, values_from = value) %>%  
+  filter(!is.na(P1)) %>% 
+  mutate(location.longitude = as.numeric(location.longitude)) %>% 
+  mutate(location.latitude  = as.numeric(location.latitude)) %>% 
+  rename(lat = location.latitude,
+         lon=  location.longitude,
+         Var = sensor.sensor_type.name,
+         date = timestamp)
+
+  
+
+# Samen meten ---------------------------------------------------------
+
+getlink_value <- function(link, name) {
+  df <- fromJSON(content(GET(link), as  = "text"), flatten  = TRUE)
+  df$value$kit_id <- name
+  return(df$value)
+}
+
+getobs <- function(link, name, meting) {
+  link <- paste0(link, "?$top=80")
+  df <- fromJSON(content(GET(link), as  = "text"), flatten  = TRUE)
+  df$value$kit_id <- name
+  df$value$meting <- meting
+  return(df$value)
+}
+
+
+#Get thinglist
+thinglist <- read_rds("thinglist.rds")
+
+
+#Get location of things
+locations <- bind_rows(mapply(getlink_value,
+                              thinglist$`Locations@iot.navigationLink`, 
+                              thinglist$name)) %>% 
+  filter(!is.na(name))
+
+x <- vector()
+for( i in 1:length(locations$location.coordinates)) {
+  x[i] <- locations$location.coordinates[[i]][1]
+}
+locations$lon <- x
+
+y <- vector()
+for( i in 1:length(locations$location.coordinates)) {
+  y[i] <- locations$location.coordinates[[i]][2]
+}
+locations$lat <- y
+
+
+#Get information individual sensors
+df <- bind_rows(mapply(getlink_value, 
+                    thinglist$`Datastreams@iot.navigationLink`, 
+                    thinglist$name,
+                    SIMPLIFY = FALSE)) %>% 
+  separate(description, c("d1", "d2", "meting"), sep = "-")
+
+
+#Observations
+obs <- bind_rows(mapply(getobs,
+                        df$`Observations@iot.navigationLink`,
+                        df$kit_id,
+                        df$meting,
+                        SIMPLIFY = FALSE))
+
+#Change variables and link to coordinates
+input_df <- obs %>% 
+  mutate(phenomenonTime = ymd_hms(phenomenonTime)) %>% 
+  rename(date = phenomenonTime) %>%
+  group_by(kit_id, date, meting) %>% 
+  summarise(result_m = mean(result)) %>% 
+  pivot_wider(names_from = meting,
+              values_from = result_m) %>% 
+  inner_join(locations, by = "kit_id")
+
+library(DT)
+library(geoshaper)
 library(leaflet)
 library(leaflet.extras)
-library(dplyr)
+library(magrittr)
+library(markdown)
+library(openair)
+library(plotly)
+library(purrr)
+library(purrrlyr)
+library(shiny)
 library(shinythemes)
 library(shinyWidgets)
-library(purrr)
 library(sp)
-library(devtools)
-library(geoshaper)
-library(shiny)
-library(dplyr)
-library(jsonlite)
-library(tidyr)
-library(plyr)
-library(ggplot2)
-library(plotly)
-library(markdown)
-library(DT)
 
-## Gedeelte 2 ----
-# Inladen RDS bestanden API's; Samen Meten en Luftdaten.
+projectnaam <- "Burger Sensor Data platform"
 
-# API Samen Meten.
-file1 <- "LTD_22481.rds" 
-file2 <- "LTD_24283.rds"
-file3 <- "LTD_24322.rds"
-file4 <- "LTD_24801.rds"
-file5 <- "LTD_25494.rds"
-file6 <- "LTD_27239.rds"
-file7 <- "LTD_27720.rds"
-file8 <- "LTD_31298.rds"
-# API Luftdaten.
-file9 <- "API_Luftdaten.rds"
-
-# RDS bestanden omzetten naar datasets.
-
-# API Samen Meten.
-input_df1 <- readRDS(file1)
-input_df2 <- readRDS(file2)
-input_df3 <- readRDS(file3)
-input_df4 <- readRDS(file4)
-input_df5 <- readRDS(file5)
-input_df6 <- readRDS(file6)
-input_df7 <- readRDS(file7)
-input_df8 <- readRDS(file8)
-# API Luftdaten.
-API_Luftdaten <- readRDS(file9)
-
-# Samenvoegen Samen Meten API datasets.
-input_df <-  rbind.fill(input_df1,input_df2,input_df3,input_df4,input_df5,input_df6,input_df7,input_df8)
-
-## Gedeelte 3 ----
-# Inladen reactieve onderdelen.
 
 # Functies voor het genereren van de input opties voor openair call.
 source("selectReactiveComponent.R", local = TRUE) 
@@ -123,3 +168,5 @@ lml_labels <- vector("list", length(lml_stations$code))
 lml_labels[grep('NL49', lml_stations$code)] <- "GGD"
 lml_labels[grep('NL10', lml_stations$code)] <- "LML"
 lml_labels <- as.list(paste(lml_labels, lml_stations$code, sep = ": "))
+
+#Test
