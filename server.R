@@ -258,17 +258,17 @@ function(input, output, session){
       show_input <- merge(show_input,values$df_gem, all = T) }
     
     # if / else statement om correctie gekalibreerde data toe te voegen ----
-    if(comp == "pm10"){
+    if(comp %in% c("pm10", "pm10_kal")){
       try(timePlot(show_input,
-                   pollutant = c(comp, "pm10_kal"), 
+                   pollutant = c("pm10", "pm10_kal"), 
                    wd = "wd", 
                    type = "kit_id", 
                    local.tz="Europe/Amsterdam"))
       # Call in try() zodat er geen foutmelding wordt getoond als er geen enkele sensor is aangeklikt 
     }
-    if(comp == "pm25"){
+    if(comp %in% c("pm25", "pm25_kal")){
       try(timePlot(show_input,
-                   pollutant = c(comp, "pm25_kal"), 
+                   pollutant = c("pm25", "pm25_kal"), 
                    wd = "wd", 
                    type = "kit_id", 
                    local.tz="Europe/Amsterdam"))
